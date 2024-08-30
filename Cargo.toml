@@ -1,0 +1,10 @@
+[package]
+name = "rsfish"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bitmask-enum = "2.2.4"
+derive_more = { version = "1.0.0", features = ["full"] }
+enum-map = "2.7.3"
+strum = { version = "0.26.3", features = ["derive"] }
