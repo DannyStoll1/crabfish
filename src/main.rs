@@ -10,6 +10,7 @@ mod bitboard;
 mod types;
 mod misc;
 mod uci;
+mod position;
 
 const fn main() {
     // println!("{}", engine_info());

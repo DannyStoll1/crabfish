@@ -151,6 +151,7 @@ impl CastlingRights
     const WhiteCastling: Self = Self::WhiteOO.or(Self::WhiteOOO);
     const BlackCastling: Self = Self::BlackOO.or(Self::BlackOOO);
     const AnyCastling: Self = Self::WhiteCastling.or(Self::BlackCastling);
+    const COUNT: usize = 16;
 }
 
 #[bitmask]
