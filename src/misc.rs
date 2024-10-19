@@ -7,13 +7,13 @@ pub struct Prng
 
 impl Prng
 {
-    fn new(seed: u64) -> Self
+    pub fn new(seed: u64) -> Self
     {
         assert!(seed != 0);
         Self { s: seed }
     }
 
-    fn rand64(&mut self) -> u64
+    pub fn rand64(&mut self) -> u64
     {
         const N: Wrapping<u64> = Wrapping(2_685_821_657_736_338_717);
         let mut s = Wrapping(self.s);
@@ -24,14 +24,14 @@ impl Prng
         (s * N).0
     }
 
-    fn rand<T>(&mut self) -> T
+    pub fn rand<T>(&mut self) -> T
     where
         T: From<u64>,
     {
         T::from(self.rand64())
     }
 
-    fn sparse_rand<T>(&mut self) -> T
+    pub fn sparse_rand<T>(&mut self) -> T
     where
         T: From<u64>,
     {

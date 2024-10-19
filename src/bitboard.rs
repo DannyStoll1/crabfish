@@ -146,7 +146,7 @@ fn init_between_bbs() -> BoardMap<BoardMap<Bitboard>>
     for src in Square::iter_board() {
         for pt in [PieceType::Bishop, PieceType::Rook] {
             for dst in Square::iter_board() {
-                if (pseudo_attacks()[pt][src] & dst.into()).nonzero() {
+                if (pseudo_attacks()[pt][src] & dst.into()).nonempty() {
                     between_bbs[src][dst] = Bitboard::attacks_for_piece(pt, src, dst.into())
                         & Bitboard::attacks_for_piece(pt, dst, src.into());
                 }
@@ -323,19 +323,21 @@ impl Bitboard
         Self(Self::FileA.0 << f.discriminant())
     }
 
+    #[inline]
     const fn more_than_one(self) -> bool
     {
         self.0 & (self.0 - 1) != 0
     }
 
-    const fn is_empty(self) -> bool
+    #[inline]
+    pub const fn is_empty(self) -> bool
     {
         self.0 != 0
     }
 
     // Returns the squares attacked by pawns of the given color
     // from the squares in the given bitboard.
-    const fn pawn_attacks<const C: Color>(self) -> Self
+    pub const fn pawn_attacks<const C: Color>(self) -> Self
     {
         Self(match C {
             Color::White => {
@@ -397,7 +399,8 @@ impl Bitboard
     //     return BetweenBB[s1][s2];
     // }
 
-    pub const fn nonzero(self) -> bool
+    #[inline]
+    pub const fn nonempty(self) -> bool
     {
         self.0 != 0
     }
@@ -413,14 +416,14 @@ impl Bitboard
     #[inline]
     pub fn lsb(self) -> Square
     {
-        assert!(self.nonzero());
+        assert!(self.nonempty());
         Square(self.0.trailing_zeros() as i8)
     }
     // Returns the most significant bit in a non-zero bitboard.
     #[inline]
     pub fn msb(self) -> Square
     {
-        assert!(self.nonzero());
+        assert!(self.nonempty());
         Square(63 ^ self.0.leading_zeros() as i8)
     }
 
@@ -429,7 +432,7 @@ impl Bitboard
     #[inline]
     pub fn least_significant_square_bb(self) -> Self
     {
-        assert!(self.nonzero());
+        assert!(self.nonempty());
         unsafe {
             let this: i64 = std::mem::transmute(self.0);
             std::mem::transmute(this & -this)
@@ -440,14 +443,14 @@ impl Bitboard
     #[inline]
     pub fn pop_lsb(&mut self) -> Square
     {
-        assert!(self.nonzero());
+        assert!(self.nonempty());
         let s: Square = self.lsb();
         self.0 &= self.0 - 1;
         s
     }
 
     #[inline]
-    fn attacks_for_piece(pt: PieceType, sq: Square, occupied: Self) -> Self
+    pub fn attacks_for_piece(pt: PieceType, sq: Square, occupied: Self) -> Self
     {
         debug_assert!(!matches!(pt, PieceType::Pawn));
         debug_assert!(sq.is_ok());
@@ -461,7 +464,7 @@ impl Bitboard
     }
 
     #[inline]
-    fn attacks_bb<const pt: PieceType>(sq: Square, occupied: Self) -> Self
+    pub fn attacks_bb<const pt: PieceType>(sq: Square, occupied: Self) -> Self
     {
         debug_assert!(!matches!(pt, PieceType::Pawn));
         debug_assert!(sq.is_ok());
@@ -536,10 +539,10 @@ impl Bitboard
 
         for &dir in dirs {
             let mut s = sq;
-            while Self::safe_destination(s, dir).nonzero() {
+            while Self::safe_destination(s, dir).nonempty() {
                 s += dir;
                 attacks |= s.into();
-                if (occupied & s.into()).nonzero() {
+                if (occupied & s.into()).nonempty() {
                     break;
                 }
             }
@@ -679,7 +682,7 @@ impl From<File> for Bitboard
 #[inline]
 fn aligned(s1: Square, s2: Square, s3: Square) -> bool
 {
-    (Bitboard::line(s1, s2) & s3.into()).nonzero()
+    (Bitboard::line(s1, s2) & s3.into()).nonempty()
 }
 
 impl std::fmt::Display for Bitboard
@@ -691,7 +694,7 @@ impl std::fmt::Display for Bitboard
         writeln!(f, "{SEP}")?;
         for rank in Rank::iter().rev() {
             for file in File::iter() {
-                if (Square::new(file, rank) & *self).nonzero() {
+                if (Square::new(file, rank) & *self).nonempty() {
                     write!(f, "| X ")?;
                 } else {
                     write!(f, "|   ")?;

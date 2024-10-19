@@ -17,9 +17,9 @@
 */
 
 use bitmask_enum::bitmask;
-use derive_more::{Add, AddAssign, Display, Neg, Sub, SubAssign};
+use derive_more::{BitXor, Add, AddAssign, Display, Neg, Sub, SubAssign};
 use enum_map::{Enum, EnumMap};
-use std::marker::ConstParamTy;
+use std::{iter::Step, marker::ConstParamTy};
 use strum::{EnumCount, EnumIter};
 
 use crate::bitboard::square_distance_table;
@@ -93,14 +93,32 @@ pub const Is64Bit: bool = true;
 #[cfg(not(target_pointer_width = "64"))]
 pub const Is64Bit: bool = false;
 
-#[derive(Clone, Copy, Debug)]
-pub struct Key(u64);
+#[derive(Clone, Copy, Debug, Default, BitXor)]
+pub struct Key(pub u64);
 impl Key
 {
     // Based on a congruential pseudo-random number generator
     pub const fn new(seed: u64) -> Self
     {
         Self(seed * 6_364_136_223_846_793_005_u64 + 1_442_695_040_888_963_407_u64)
+    }
+
+    #[inline]
+    pub const fn hash_0(self) -> i32
+    {
+        self.0 as i32 & 0x1fff
+    }
+    #[inline]
+    pub const fn hash_1(self) -> i32
+    {
+        (self.0 >> 16) as i32 & 0x1fff
+    }
+}
+impl From<u64> for Key
+{
+    fn from(value: u64) -> Self
+    {
+        Self(value)
     }
 }
 
@@ -135,7 +153,7 @@ impl Color
     }
 }
 
-#[bitmask]
+#[bitmask(u8)]
 pub enum CastlingRights
 {
     WhiteOO,
@@ -151,7 +169,30 @@ impl CastlingRights
     const WhiteCastling: Self = Self::WhiteOO.or(Self::WhiteOOO);
     const BlackCastling: Self = Self::BlackOO.or(Self::BlackOOO);
     const AnyCastling: Self = Self::WhiteCastling.or(Self::BlackCastling);
-    const COUNT: usize = 16;
+
+    pub fn iter() -> impl Iterator<Item = Self>
+    {
+        unsafe { (0u8..Self::LENGTH as u8).map(|x| std::mem::transmute(x)) }
+    }
+}
+impl enum_map::Enum for CastlingRights
+{
+    const LENGTH: usize = 16;
+    fn into_usize(self) -> usize
+    {
+        unsafe {
+            let val: u8 = std::mem::transmute(self);
+            val as usize
+        }
+    }
+    fn from_usize(value: usize) -> Self
+    {
+        unsafe { std::mem::transmute(value as u8) }
+    }
+}
+impl<T> enum_map::EnumArray<T> for CastlingRights
+{
+    type Array = [T; Self::LENGTH];
 }
 
 #[bitmask]
@@ -209,7 +250,7 @@ impl Value
 #[derive(Clone, Copy, Debug, Enum, EnumIter, ConstParamTy, PartialEq, Eq)]
 pub enum PieceType
 {
-    // AllPieces = 0,
+    AllPieces = 0,
     // None,
     Pawn,
     Knight,
@@ -226,36 +267,29 @@ impl PieceType
     }
 }
 
-#[derive(Enum)]
+#[derive(Enum, Clone, Copy, Debug)]
 pub enum Piece
 {
-    WPawn = 0,
+    NoPiece = 0,
+    WPawn = 1,
     WKnight,
     WBishop,
     WRook,
     WQueen,
     WKing,
-    _Invalid6,
     _Invalid7,
-    BPawn = 8,
+    _Invalid8,
+    BPawn = 9,
     BKnight,
     BBishop,
     BRook,
     BQueen,
     BKing,
-    _Invalid14,
     _Invalid15,
 }
 impl Piece
 {
     const VALUE_MAP: EnumMap<Self, Value> = EnumMap::from_array([
-        Value::PawnValue,
-        Value::KnightValue,
-        Value::BishopValue,
-        Value::RookValue,
-        Value::QueenValue,
-        Value::ZERO,
-        Value::ZERO,
         Value::ZERO,
         Value::PawnValue,
         Value::KnightValue,
@@ -263,6 +297,14 @@ impl Piece
         Value::RookValue,
         Value::QueenValue,
         Value::ZERO,
+        Value::ZERO,
+        //
+        Value::ZERO,
+        Value::PawnValue,
+        Value::KnightValue,
+        Value::BishopValue,
+        Value::RookValue,
+        Value::QueenValue,
         Value::ZERO,
         Value::ZERO,
     ]);
@@ -270,6 +312,11 @@ impl Piece
     pub fn value(self) -> Value
     {
         Self::VALUE_MAP[self]
+    }
+
+    pub fn iter() -> impl Iterator<Item = Self>
+    {
+        unsafe { (0u8..6u8).chain(8u8..14u8).map(|i| std::mem::transmute(i)) }
     }
 }
 
@@ -355,6 +402,38 @@ impl Square
     {
         debug_assert!(self != Self::A1);
         Self(self.0 - 1)
+    }
+
+    pub(crate) fn next(self) -> Self
+    {
+        Self(self.0 + 1)
+    }
+}
+impl Step for Square
+{
+    fn forward(start: Self, count: usize) -> Self
+    {
+        Self(start.0 + count as i8)
+    }
+    fn backward(start: Self, count: usize) -> Self
+    {
+        Self(start.0 - count as i8)
+    }
+    fn forward_checked(start: Self, count: usize) -> Option<Self>
+    {
+        if count >= 64 || start.0 as usize + count >= 64 {
+            None
+        } else {
+            Some(Step::forward(start, count))
+        }
+    }
+    fn backward_checked(start: Self, count: usize) -> Option<Self>
+    {
+        (count < 64 && start.0 as usize >= count).then(|| Step::backward(start, count))
+    }
+    fn steps_between(start: &Self, end: &Self) -> Option<usize>
+    {
+        (end >= start).then(|| (end.0 - start.0) as usize)
     }
 }
 // {
@@ -486,7 +565,7 @@ impl std::ops::Mul<Direction> for i8
     }
 }
 
-#[derive(Clone, Copy, Debug, EnumIter, EnumCount)]
+#[derive(Clone, Copy, Debug, Enum, EnumIter, EnumCount)]
 // struct File(i8);
 #[repr(u8)]
 pub enum File

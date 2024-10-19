@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 #![feature(adt_const_params)]
 #![feature(sync_unsafe_cell)]
+#![feature(step_trait)]
 
 mod nnue;
 mod syzygy;
